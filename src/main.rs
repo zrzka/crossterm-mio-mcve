@@ -5,8 +5,8 @@ use crossterm::screen::RawScreen;
 use libc;
 use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
 
-const TTY_TOKEN: Token = Token(0);
-const TTY_BUFFER_SIZE: usize = 1_024;
+const STDIN_TOKEN: Token = Token(0);
+const STDIN_BUFFER_SIZE: usize = 1_024;
 const EXCLAMATION_MARK: u8 = b'!';
 
 fn main() -> Result<()> {
@@ -18,21 +18,26 @@ fn main() -> Result<()> {
 
     let poll = Poll::new()?;
 
-    let tty_raw_fd = libc::STDIN_FILENO;
-    let tty_evented = EventedFd(&tty_raw_fd);
-    poll.register(&tty_evented, TTY_TOKEN, Ready::readable(), PollOpt::level())?;
+    let stdin_raw_fd = libc::STDIN_FILENO;
+    let stdin_evented = EventedFd(&stdin_raw_fd);
+    poll.register(
+        &stdin_evented,
+        STDIN_TOKEN,
+        Ready::readable(),
+        PollOpt::level(),
+    )?;
 
     let mut events = Events::with_capacity(16);
-    let mut buffer = [0u8; TTY_BUFFER_SIZE];
+    let mut buffer = [0u8; STDIN_BUFFER_SIZE];
 
     let mut poll_call_count: usize = 0;
-    let mut poll_tty_event_count: usize = 0;
+    let mut poll_stdin_event_count: usize = 0;
     let mut total_bytes_count: usize = 0;
 
     loop {
         print!(
-            "\x1B[1GPoll call count: {} Tty event count: {} Bytes read: {}",
-            poll_call_count, poll_tty_event_count, total_bytes_count
+            "\x1B[1GPoll call count: {} STDIN event count: {} Bytes read: {}",
+            poll_call_count, poll_stdin_event_count, total_bytes_count
         );
 
         if total_bytes_count > 0 {
@@ -44,17 +49,17 @@ fn main() -> Result<()> {
         if count > 0 {
             let tokens = events.iter().map(|e| e.token()).collect::<Vec<Token>>();
 
-            if !tokens.contains(&TTY_TOKEN) {
+            if !tokens.contains(&STDIN_TOKEN) {
                 continue;
             }
 
-            poll_tty_event_count += 1;
+            poll_stdin_event_count += 1;
 
             let read_count = unsafe {
                 libc::read(
-                    tty_raw_fd,
+                    stdin_raw_fd,
                     buffer.as_mut_ptr() as *mut libc::c_void,
-                    TTY_BUFFER_SIZE as libc::size_t,
+                    STDIN_BUFFER_SIZE as libc::size_t,
                 ) as isize
             };
 
@@ -71,9 +76,9 @@ fn main() -> Result<()> {
     }
 
     println!(
-        "\x1B[1GPoll: {} Tty event: {} Total bytes: {} Time: {:?}\r",
+        "\x1B[1GPoll call: {} STDIN event count: {} Bytes read: {} Time: {:?}\r",
         poll_call_count,
-        poll_tty_event_count,
+        poll_stdin_event_count,
         total_bytes_count,
         start.elapsed(),
     );
