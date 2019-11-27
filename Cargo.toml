@@ -8,7 +8,10 @@ edition = "2018"
 
 [dependencies]
 libc = "0.2.51"
-mio = "0.6.19"
+
+[dependencies.mio]
+git = "https://github.com/tokio-rs/mio"
+branch = "master"
 
 [dependencies.crossterm]
 git = "https://github.com/crossterm-rs/crossterm.git"
